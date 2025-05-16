@@ -21,7 +21,7 @@ phases:
       - echo "Checking for pom.xml..."
       - test -f pom.xml || { echo "pom.xml not found in root directory"; exit 1; }
       - echo Building Java app...
-      - mvn package -DskipTests
+      - mvn -X package -DskipTests
       - echo Starting sample app...
       - nohup java -jar target/sample-app.jar &
       - sleep 10
