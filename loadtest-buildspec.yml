@@ -4,34 +4,48 @@ phases:
   install:
     runtime-versions:
       java: corretto11
+      python: 3.x
     commands:
-      - echo Installing JMeter...
+      - echo Installing Apache JMeter...
       - wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.5.tgz
       - tar -xzf apache-jmeter-5.5.tgz
-      - export PATH=$PATH:/apache-jmeter-5.5/bin
+      - export PATH=$PATH:$(pwd)/apache-jmeter-5.5/bin
+      - echo Verifying JMeter version...
+      - jmeter -v
+
   pre_build:
     commands:
       - echo Preparing load tests...
+      - echo "Listing current directory contents..."
+      - ls -la
+      - echo "Checking for pom.xml..."
+      - test -f pom.xml || { echo "pom.xml not found in root directory"; exit 1; }
+      - echo Building Java app...
       - mvn package -DskipTests
+      - echo Starting sample app...
       - nohup java -jar target/sample-app.jar &
       - sleep 10
+      - curl -s http://localhost:8080 || echo "App may not have started properly"
+
   build:
     commands:
       - echo Running load tests...
       - jmeter -n -t load-tests/test-plan.jmx -l results.jtl -e -o report
       - echo Evaluating performance thresholds...
       - python3 load-tests/evaluate_performance.py results.jtl
+
   post_build:
     commands:
       - echo Load tests completed on `date`
-      - kill $(lsof -t -i:8080)
+      - echo Killing sample app on port 8080...
+      - kill $(lsof -t -i:8080) || echo "App was not running"
 
 reports:
   jmeter-reports:
     files:
       - 'report/**/*'
     base-directory: '.'
-    file-format: 'JMETERHTML'
+    file-format: JMETERHTML
 
 artifacts:
   files:
