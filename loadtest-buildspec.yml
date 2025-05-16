@@ -6,7 +6,7 @@ phases:
       java: corretto11
     commands:
       - echo Installing JMeter...
-      - wget https://dlcdn.apache.org//jmeter/binaries/apache-jmeter-5.5.tgz
+      - wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.5.tgz
       - tar -xzf apache-jmeter-5.5.tgz
       - export PATH=$PATH:/apache-jmeter-5.5/bin
   pre_build:
