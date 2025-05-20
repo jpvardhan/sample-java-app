@@ -3,50 +3,42 @@ version: 0.2
 phases:
   install:
     runtime-versions:
-      java: corretto11
+      java: corretto17
     commands:
-      - echo "Installing JMeter..."
-      - export JMETER_VERSION=5.6.3
-      - wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-$JMETER_VERSION.tgz || { echo "❌ Failed to download JMeter"; exit 1; }
-      - tar -xzf apache-jmeter-$JMETER_VERSION.tgz
-      - export PATH=$PATH:$PWD/apache-jmeter-$JMETER_VERSION/bin
-      - echo "✅ JMeter installed successfully"
-
+      - echo "Installing JMeter and dependencies..."
+      - wget https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.5.tgz
+      - tar -xzf apache-jmeter-5.5.tgz
+      - sudo yum update -y && sudo yum install -y lsof  # Install lsof for post-build
+      - echo "Adding JMeter to PATH"
+      - export JMETER_HOME=$(pwd)/apache-jmeter-5.5
+      - echo "export PATH=$JMETER_HOME/bin:$PATH" >> ~/.bashrc
+      - source ~/.bashrc
   pre_build:
     commands:
-      - echo "Checking for Maven project..."
-      - test -f pom.xml || { echo "❌ pom.xml not found"; exit 1; }
       - echo "Preparing load tests..."
-      - mvn package -DskipTests || { echo "❌ Maven build failed"; exit 1; }
-      - test -f target/*.jar || { echo "❌ JAR file not found in target"; exit 1; }
-      - echo "✅ Application packaged. Starting app..."
-      - nohup java -jar target/*.jar &
+      - mvn package -DskipTests
+      - nohup java -jar target/sample-app.jar &
       - sleep 10
-      - echo "✅ App started on port 8080"
-
   build:
     commands:
       - echo "Running load tests..."
-      - test -f load-tests/test-plan.jmx || { echo "❌ JMeter test plan not found"; exit 1; }
-      - jmeter -n -t load-tests/test-plan.jmx -l results.jtl -e -o report || { echo "❌ JMeter test failed"; exit 1; }
+      - $JMETER_HOME/bin/jmeter -n -t load-tests/test-plan.jmx -l results.jtl -e -o report
       - echo "Evaluating performance thresholds..."
-      - python3 load-tests/evaluate_performance.py results.jtl || echo "⚠️ Performance evaluation script failed (continuing build)"
-
+      - python3 load-tests/evaluate_performance.py results.jtl
   post_build:
     commands:
-      - echo "Load tests completed at `date`"
-      - kill $(lsof -t -i:8080) || echo "⚠️ Failed to kill app on port 8080"
+      - echo "Load tests completed on $(date)"
+      - pkill -f 'java -jar target/sample-app.jar' || echo "App not running"
 
 reports:
   jmeter-reports:
     files:
       - 'report/**/*'
     base-directory: '.'
-    file-format: JMETERHTML
+    file-format: 'JMETERHTML'
 
 artifacts:
   files:
-    - report/**/*
-    - results.jtl
+    - 'report/**/*'
+    - 'results.jtl'
   discard-paths: no
-
